@@ -1,0 +1,212 @@
+name: Rust tests.
+
+on:
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+
+  build:
+    name: Rust tests and debug build.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      - name: Cache build
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-provider: "github"
+          cache-on-failure: "false"
+      - name: Build binaries in debug mode
+        run: cargo build
+      - name: Run cargo tests
+        run: cargo test
+      - name: Run clippy
+        run: cargo clippy -- --deny "warnings"
+      - name: Prepare artifacts
+        run: install ./target/debug/pg_doorman ./tests/
+      - name: Upload pg_doorman
+        uses: actions/upload-artifact@v4
+        with:
+          name: tests
+          path: ./tests/
+
+  go-test:
+    name: Go (protocol,pgx,lib/pq).
+    needs: build
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_HOST_AUTH_METHOD: "trust"
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    steps:
+      - name: Download tests
+        uses: actions/download-artifact@v4
+        with:
+          name: tests
+          path: tests
+      - name: Tree.
+        run: tree tests
+      - name: Setup Golang caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: "${{ runner.os }}-golang-${{ hashFiles('go/go.sum') }}"
+          restore-keys: |
+            ${{ runner.os }}-golang-
+      - name: Run fixtures.
+        run: psql -h 127.0.0.1 -p 5432 -U postgres -f ./tests/fixture.sql
+      - name: Run tests.
+        run: |
+          chmod +x ./tests/pg_doorman && 
+          ./tests/pg_doorman --version &&
+          (./tests/pg_doorman -l debug ./tests/tests.toml > /tmp/pg_doorman.log &) &&
+          cd ./tests/go && 
+          source ./env &&
+          go test -v .
+
+  ruby-test:
+    name: Ruby (protocol,pg).
+    needs: build
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_HOST_AUTH_METHOD: "trust"
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    steps:
+      - name: Download tests
+        uses: actions/download-artifact@v4
+        with:
+          name: tests
+          path: tests
+      - name: Tree.
+        run: tree tests
+      - name: Setup Ruby caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            ruby
+          key: "${{ runner.os }}-ruby"
+          restore-keys: |
+            ${{ runner.os }}-ruby
+      - name: Run fixtures.
+        run: psql -h 127.0.0.1 -p 5432 -U postgres -f ./tests/fixture.sql
+      - name: Run tests.
+        run: |
+          chmod +x ./tests/pg_doorman && 
+          ./tests/pg_doorman --version &&
+          (./tests/pg_doorman -l debug ./tests/tests.toml > /tmp/pg_doorman.log &) &&
+          sudo apt-get update &&  sudo apt-get install ruby-bundler ruby-dev -y &&
+          bundle config path ruby &&
+          cd ./tests/ruby && 
+          bundle install &&
+          bundle exec ruby test.rb &&
+          bundle exec rspec *_spec.rb
+
+  python-test:
+    name: Python (psycopg2,asyncpg).
+    needs: build
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_HOST_AUTH_METHOD: "trust"
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    steps:
+      - name: Download tests
+        uses: actions/download-artifact@v4
+        with:
+          name: tests
+          path: tests
+      - name: Tree.
+        run: tree tests
+      - name: Setup Python caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            ./tests/python/.venv
+          key: "${{ runner.os }}-python"
+          restore-keys: |
+            ${{ runner.os }}-python
+      - name: Run fixtures.
+        run: psql -h 127.0.0.1 -p 5432 -U postgres -f ./tests/fixture.sql
+      - name: Run tests.
+        run: |
+          chmod +x ./tests/pg_doorman && 
+          ./tests/pg_doorman --version &&
+          (./tests/pg_doorman -l debug ./tests/tests.toml &) &&
+          cd ./tests/python &&
+          python3 -m venv .venv &&
+          source .venv/bin/activate &&
+          pip install -r requirements.txt &&
+          echo "Run async" && python ./test_async.py &&
+          echo "Run psycopg2" && python ./test_psycopg2.py
+
+  nodejs-test:
+    name: NodeJS (pg).
+    needs: build
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_HOST_AUTH_METHOD: "trust"
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    steps:
+      - name: Download tests
+        uses: actions/download-artifact@v4
+        with:
+          name: tests
+          path: tests
+      - name: Tree.
+        run: tree tests
+      - name: Setup Python caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            ./tests/nodejs/node_modules
+          key: "${{ runner.os }}-nodejs"
+          restore-keys: |
+            ${{ runner.os }}-nodejs
+      - name: Run fixtures.
+        run: psql -h 127.0.0.1 -p 5432 -U postgres -f ./tests/fixture.sql
+      - name: Run tests.
+        run: |
+          chmod +x ./tests/pg_doorman && 
+          ./tests/pg_doorman --version &&
+          (./tests/pg_doorman -l debug ./tests/tests.toml &) &&
+          sudo apt-get update &&  sudo apt-get install nodejs npm -y &&
+          cd ./tests/nodejs &&
+          npm install pg &&
+          nodejs ./run.js

@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+export DATABASE_URL="postgresql://example_user_1:test@localhost:6433/example_db?sslmode=disable"
+export DATABASE_URL_ALIAS="postgresql://example_user_1:test@localhost:6433/example_db_alias?sslmode=disable"
+export DATABASE_URL_MD5_AUTH_BAD="postgresql://example_user_auth_md5:test1@localhost:6433/example_db_auth?sslmode=disable"
+export DATABASE_URL_MD5_AUTH_OK="postgresql://example_user_auth_md5:test@localhost:6433/example_db_auth?sslmode=disable"
+export DATABASE_URL_SCRAM_AUTH_BAD="postgresql://example_user_auth_scram:test1@localhost:6433/example_db_auth?sslmode=disable"
+export DATABASE_URL_SCRAM_AUTH_OK="postgresql://example_user_auth_scram:test@localhost:6433/example_db_auth?sslmode=disable"
+export DATABASE_URL_JWT_AUTH_BAD="postgresql://example_user_auth_jwt:test1@localhost:6433/example_db_auth?sslmode=disable"
+export DATABASE_URL_JWT_AUTH_OK="postgresql://example_user_auth_jwt:test@localhost:6433/example_db_auth?sslmode=disable"
