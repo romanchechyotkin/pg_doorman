@@ -308,7 +308,7 @@ pub struct General {
     pub admin_username: String,
     pub admin_password: String,
 
-    #[serde(default)]
+    #[serde(default = "General::default_prepared_statements")]
     pub prepared_statements: bool,
 
     #[serde(default = "General::default_prepared_statements_cache_size")]
@@ -444,6 +444,9 @@ impl General {
     pub fn default_prepared_statements_cache_size() -> usize {
         8 * 1024
     }
+    pub fn default_prepared_statements() -> bool {
+        true
+    }
 
     pub fn default_daemon_pid_file() -> String {
         "/tmp/pg_doorman.pid".to_string()
@@ -530,8 +533,8 @@ impl Default for General {
             admin_password: String::from("admin"),
             server_lifetime: Self::default_server_lifetime(),
             server_round_robin: Self::default_server_round_robin(),
-            prepared_statements: false,
-            prepared_statements_cache_size: 500,
+            prepared_statements: Self::default_prepared_statements(),
+            prepared_statements_cache_size: Self::default_prepared_statements_cache_size(),
             hba: vec![],
             daemon_pid_file: Self::default_daemon_pid_file(),
             syslog_prog_name: None,
@@ -920,6 +923,11 @@ impl Config {
             return Err(Error::BadConfig(
                 "tls rate limit should be multiple 100".to_string(),
             ));
+        }
+
+        // Validate prepared_statements
+        if self.general.prepared_statements && self.general.prepared_statements_cache_size == 0 {
+            return Err(Error::BadConfig("The value of prepared_statements_cache should be greater than 0 if prepared_statements are enabled".to_string()));
         }
 
         // Validate TLS!

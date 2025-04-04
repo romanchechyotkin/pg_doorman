@@ -251,6 +251,11 @@ impl ConnectionPool {
                         error_count: Arc::new(AtomicU64::new(0)),
                     };
 
+                    let prepared_statements_cache_size = match config.general.prepared_statements {
+                        true => pool_config.prepared_statements_cache_size,
+                        false => 0,
+                    };
+
                     let manager = ServerPool::new(
                         address.clone(),
                         user.clone(),
@@ -258,7 +263,7 @@ impl ConnectionPool {
                         client_server_map.clone(),
                         pool_config.cleanup_server_connections,
                         pool_config.log_client_parameter_status_changes,
-                        pool_config.prepared_statements_cache_size,
+                        prepared_statements_cache_size,
                     );
 
                     let queue_strategy = match config.general.server_round_robin {
@@ -305,12 +310,9 @@ impl ConnectionPool {
                             life_time_ms: config.general.server_lifetime,
                             sync_server_parameters: config.general.sync_server_parameters,
                         },
-                        prepared_statement_cache: match config
-                            .general
-                            .prepared_statements_cache_size
-                        {
-                            0 => None,
-                            _ => Some(Arc::new(Mutex::new(PreparedStatementCache::new(
+                        prepared_statement_cache: match config.general.prepared_statements {
+                            false => None,
+                            true => Some(Arc::new(Mutex::new(PreparedStatementCache::new(
                                 config.general.prepared_statements_cache_size,
                             )))),
                         },
