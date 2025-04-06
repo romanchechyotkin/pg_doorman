@@ -13,7 +13,7 @@ use std::time::{Duration, SystemTime};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, BufStream};
 use tokio::net::{TcpStream, UnixStream};
 
-use crate::config::{get_config, Address, User};
+use crate::config::{get_config, Address, User, VERSION};
 use crate::constants::*;
 use crate::errors::{Error, ServerIdentifier};
 use crate::messages::BytesMutReader;
@@ -139,16 +139,19 @@ impl CleanupState {
         }
     }
 
+    #[inline(always)]
     fn needs_cleanup(&self) -> bool {
         self.needs_cleanup_set || self.needs_cleanup_prepare || self.needs_cleanup_declare
     }
 
+    #[inline(always)]
     fn set_true(&mut self) {
         self.needs_cleanup_set = true;
         self.needs_cleanup_prepare = true;
         self.needs_cleanup_declare = true;
     }
 
+    #[inline(always)]
     fn reset(&mut self) {
         self.needs_cleanup_set = false;
         self.needs_cleanup_prepare = false;
@@ -189,6 +192,14 @@ impl Default for ServerParameters {
 
 impl ServerParameters {
     pub fn new() -> Self {
+        ServerParameters {
+            parameters: HashMap::new(),
+        }
+    }
+    pub fn is_empty(&self) -> bool {
+        self.parameters.is_empty()
+    }
+    pub fn admin() -> Self {
         let mut server_parameters = ServerParameters {
             parameters: HashMap::new(),
         };
@@ -196,17 +207,15 @@ impl ServerParameters {
         server_parameters.set_param("client_encoding".to_string(), "UTF8".to_string(), false);
         server_parameters.set_param("DateStyle".to_string(), "ISO, MDY".to_string(), false);
         server_parameters.set_param("TimeZone".to_string(), "Etc/UTC".to_string(), false);
-        let server_version = get_config()
-            .general
-            .override_startup_packet_server_version
-            .unwrap_or_else(|| "9.6.0".to_string());
-        server_parameters.set_param("server_version".to_string(), server_version, true);
+        server_parameters.set_param("server_version".to_string(), VERSION.to_string(), true);
         server_parameters.set_param("server_encoding".to_string(), "UTF-8".to_string(), true);
         server_parameters.set_param(
             "standard_conforming_strings".to_string(),
             "on".to_string(),
             false,
         );
+        // (64 bit = on) as of PostgreSQL 10, this is always on.
+        server_parameters.set_param("integer_datetimes".to_string(), "on".to_string(), false);
         server_parameters.set_param(
             "application_name".to_string(),
             "pg_doorman".to_string(),
@@ -231,14 +240,14 @@ impl ServerParameters {
         }
     }
 
-    pub fn set_from_hashmap(&mut self, parameters: &HashMap<String, String>, startup: bool) {
-        // iterate through each and call set_param
+    pub fn set_from_hashmap(&mut self, parameters: HashMap<String, String>, startup: bool) {
         for (key, value) in parameters {
             self.set_param(key.to_string(), value.to_string(), startup);
         }
     }
 
     // Gets the diff of the parameters
+    #[inline(always)]
     fn compare_params(&self, incoming_parameters: &ServerParameters) -> HashMap<String, String> {
         let mut diff = HashMap::new();
 
@@ -400,6 +409,11 @@ impl Server {
     #[inline(always)]
     pub fn get_process_id(&self) -> i32 {
         self.process_id
+    }
+
+    #[inline(always)]
+    pub fn server_parameters_as_hashmap(&self) -> HashMap<String, String> {
+        self.server_parameters.parameters.clone()
     }
 
     /// Receive data from the server in response to a client request.

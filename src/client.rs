@@ -15,7 +15,7 @@ use tokio::net::TcpStream;
 use tokio::sync::broadcast::Receiver;
 use tokio::sync::mpsc::Sender;
 
-use crate::admin::{generate_server_parameters_for_admin, handle_admin};
+use crate::admin::handle_admin;
 use crate::config::{addr_in_hba, get_config, PoolMode};
 use crate::constants::*;
 use crate::jwt_auth::get_user_name_from_jwt;
@@ -619,12 +619,12 @@ where
                 return Err(error);
             }
 
-            (false, generate_server_parameters_for_admin())
+            (false, ServerParameters::admin())
         }
         // Authenticate normal user.
         else {
             let virtual_pool_id = 0;
-            let pool = match get_pool(pool_name, username, virtual_pool_id) {
+            let mut pool = match get_pool(pool_name, username, virtual_pool_id) {
                 Some(pool) => pool,
                 None => {
                     error_response(
@@ -761,12 +761,27 @@ where
             let transaction_mode = pool.settings.pool_mode == PoolMode::Transaction;
             prepared_statements_enabled =
                 transaction_mode && pool.prepared_statement_cache.is_some();
-            (transaction_mode, pool.server_parameters())
+            let server_parameters = match pool.get_server_parameters().await {
+                Ok(params) => params,
+                Err(err) => {
+                    error!("Can't proxy server parameters for database: {:?}", err);
+                    error_response(
+                        &mut write,
+                        &format!(
+                            "Can't proxy server parameters for database: {}, user: {}",
+                            pool_name, username
+                        ),
+                        "3D000",
+                    )
+                    .await?;
+                    return Err(err);
+                }
+            };
+            (transaction_mode, server_parameters)
         };
 
         // Update the parameters to merge what the application sent and what's originally on the server
-        server_parameters.set_from_hashmap(&parameters, false);
-
+        server_parameters.set_from_hashmap(parameters.clone(), false);
         auth_ok(&mut write).await?;
         write_all(&mut write, (&server_parameters).into()).await?;
         backend_key_data(&mut write, process_id, secret_key).await?;

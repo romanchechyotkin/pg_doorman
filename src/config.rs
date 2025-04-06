@@ -321,9 +321,6 @@ pub struct General {
 
     #[serde(default = "General::default_hba")]
     pub hba: Vec<IpNet>,
-
-    // override server_version in startup packet.
-    pub override_startup_packet_server_version: Option<String>,
 }
 
 impl General {
@@ -538,7 +535,6 @@ impl Default for General {
             hba: vec![],
             daemon_pid_file: Self::default_daemon_pid_file(),
             syslog_prog_name: None,
-            override_startup_packet_server_version: None,
             pooler_check_query: Self::default_pooler_check_query(),
             pooler_check_query_request_bytes: None,
             pooler_check_query_response_bytes: None,
@@ -1094,7 +1090,7 @@ mod test {
         parse(file.as_os_str().to_str().unwrap()).await.unwrap();
 
         assert_eq!(get_config().general.idle_timeout, 300000000);
-        assert_eq!(get_config().pools.len(), 3);
+        assert_eq!(get_config().pools.len(), 4);
         assert_eq!(get_config().pools["example_db"].idle_timeout, Some(40000));
         assert_eq!(get_config().pools["example_db"].users.len(), 4);
         assert_eq!(
@@ -1116,7 +1112,7 @@ mod test {
             Some(PoolMode::Transaction)
         );
         assert!(addr_in_hba(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1))));
-        assert!(!addr_in_hba(IpAddr::V4(Ipv4Addr::new(172, 0, 0, 1))));
+        assert!(!addr_in_hba(IpAddr::V4(Ipv4Addr::new(1, 1, 1, 1))));
         assert!(addr_in_hba(IpAddr::V4(Ipv4Addr::new(192, 168, 0, 1))));
     }
 

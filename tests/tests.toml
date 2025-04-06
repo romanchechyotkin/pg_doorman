@@ -29,6 +29,8 @@ max_message_size = 1048576
 admin_username = "doorman_admin"
 admin_password = "doorman_admin_password"
 
+# sync_server_parameters = true
+
 [pools]
 
 [pools.example_db]
@@ -111,4 +113,16 @@ username = "example_user_auth_jwt"
 password = "md55bfc89991e06e8f54f1b581dc945fd4c"
 server_username = "example_user_jwt"
 server_password = "jwt-priv-key-fpath:./tests/data/jwt/private.pem"
+pool_size = 40
+
+# Unknown database
+[pools.unknown_database]
+server_host = "1.1.1.1"
+server_port = 5432
+server_database = "example_db"
+pool_mode = "transaction"
+
+[pools.unknown_database.users.0]
+username = "example_user_1"
+password = "md58a67a0c805a5ee0384ea28e0dea557b6"
 pool_size = 40
