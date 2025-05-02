@@ -1,3 +1,15 @@
+# 1.8.2 (Apr 24th, 2025)
+
+### Added
+
+- `application_name` parameter in pool #30.
+- link-time optimization #29.
+
+### Fixed
+
+- If the client does not properly handle errors in copy mode, there may be a risk of connection leakage.
+
+
 # 1.8.1 (Apr 06th, 2025)
 
 ### Fixed

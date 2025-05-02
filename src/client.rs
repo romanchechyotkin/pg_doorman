@@ -1031,7 +1031,14 @@ where
                                     continue; // try to find another server.
                                 }
                             }
-                            break conn;
+                            // checkin_cleanup before give server to client.
+                            match conn.checkin_cleanup().await {
+                                Ok(()) => break conn,
+                                Err(err) => {
+                                    warn!("Server {} cleanup error: {:?}", conn.address_to_string(), err);
+                                    continue
+                                }
+                            };
                         }
                         Err(err) => {
                             // Client is attempting to get results from the server,
@@ -1068,8 +1075,6 @@ where
                     };
                 };
                 let server = conn.deref_mut();
-                // это отложенная очистка перед доступом к новому серверу.
-                server.checkin_cleanup().await?;
                 server.stats.active(self.stats.application_name());
                 server.stats.checkout_time(
                     connecting_at.elapsed().as_micros() as u64,
@@ -1388,6 +1393,11 @@ where
 
                         // CopyData
                         'd' => {
+                            if !server.in_copy_mode() {
+                                self.stats.disconnect();
+                                server.mark_bad("client expects COPY mode, but server are not in", true);
+                                return Err(Error::ProtocolSyncError("server not in copy mode".to_string()))
+                            }
                             self.buffer.put(&message[..]);
 
                             // Want to limit buffer size
@@ -1401,6 +1411,11 @@ where
                         // CopyDone or CopyFail
                         // Copy is done, successfully or not.
                         'c' | 'f' => {
+                            if !server.in_copy_mode() {
+                                self.stats.disconnect();
+                                server.mark_bad("client expects COPY mode, but server are not in", true);
+                                return Err(Error::ProtocolSyncError("server not in copy mode".to_string()))
+                            }
                             // We may already have some copy data in the buffer, add this message to buffer
                             self.buffer.put(&message[..]);
 

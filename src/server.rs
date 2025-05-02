@@ -431,7 +431,7 @@ impl Server {
             self.stats.wait_reading();
             let (code_u8, message_len) = read_message_header(&mut self.stream).await?;
             // if message server is too big.
-            if message_len > self.max_message_size && code_u8 as char == 'D' {
+            if self.max_message_size > 0 && message_len > self.max_message_size && code_u8 as char == 'D' {
                 // send current buffer + header.
                 self.buffer.put_u8(code_u8);
                 self.buffer.put_i32(message_len);
@@ -751,20 +751,28 @@ impl Server {
         self.in_copy_mode
     }
 
+    #[inline(always)]
+    pub fn address_to_string(&self) -> String {
+        self.address.to_string()
+    }
+
     /// Perform any necessary cleanup before putting the server
     /// connection back in the pool
     pub async fn checkin_cleanup(&mut self) -> Result<(), Error> {
         if self.in_copy_mode() {
             warn!("Server {} returned while still in copy-mode", self);
             self.mark_bad("returned in copy-mode", true);
+            return Err(Error::ProtocolSyncError(format!("server {} returned in copy-mode", self.address)))
         }
         if self.is_data_available() {
             warn!("Server {} returned while still has data available", self);
             self.mark_bad("returned with data available", true);
+            return Err(Error::ProtocolSyncError(format!("server {} returned with data available", self.address)))
         }
         if !self.buffer.is_empty() {
             warn!("Server {} returned while buffer is not empty", self);
             self.mark_bad("returned with not-empty buffer", true);
+            return Err(Error::ProtocolSyncError(format!("server {} with not-empty buffer", self.address)))
         }
         // Client disconnected with an open transaction on the server connection.
         // Pgbouncer behavior is to close the server connection but that can cause
@@ -1003,6 +1011,7 @@ impl Server {
         cleanup_connections: bool,
         log_client_parameter_status_changes: bool,
         prepared_statement_cache_size: usize,
+        application_name: String,
     ) -> Result<Server, Error> {
         let config = get_config();
 
@@ -1023,7 +1032,7 @@ impl Server {
             .server_username
             .unwrap_or(user.clone().username);
         // StartupMessage
-        startup(&mut stream, username.clone(), database).await?;
+        startup(&mut stream, username.clone(), database, application_name.clone()).await?;
 
         let mut process_id: i32 = 0;
         let mut secret_key: i32 = 0;
@@ -1470,7 +1479,7 @@ impl Server {
                         client_server_map,
                         connected_at: chrono::offset::Utc::now().naive_utc(),
                         stats,
-                        application_name: "pg_doorman".to_string(),
+                        application_name: application_name.clone(),
                         last_activity: SystemTime::now(),
                         cleanup_connections,
                         log_client_parameter_status_changes,

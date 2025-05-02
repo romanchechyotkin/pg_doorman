@@ -206,7 +206,7 @@ where
 
 /// Send the startup packet the server. We're pretending we're a Pg client.
 /// This tells the server which user we are and what database we want.
-pub async fn startup<S>(stream: &mut S, user: String, database: &str) -> Result<(), Error>
+pub async fn startup<S>(stream: &mut S, user: String, database: &str, application_name: String) -> Result<(), Error>
 where
     S: tokio::io::AsyncWrite + std::marker::Unpin,
 {
@@ -221,7 +221,8 @@ where
 
     // Application name
     bytes.put(&b"application_name\0"[..]);
-    bytes.put_slice(&b"pg_doorman\0"[..]);
+    bytes.put_slice(application_name.as_bytes());
+    bytes.put_u8(0);
 
     // Database
     bytes.put(&b"database\0"[..]);
@@ -818,10 +819,8 @@ where
     W: tokio::io::AsyncWrite + std::marker::Unpin,
 {
     match timeout(duration, proxy_copy_data(read, write, len)).await {
-        Ok(res) => match res {
-            Ok(len) => Ok(len),
-            Err(err) => Err(err),
-        },
+        Ok(Ok(len)) => Ok(len),
+        Ok(Err(err)) => Err(err),
         Err(_) => Err(ProxyTimeout),
     }
 }
@@ -1862,7 +1861,6 @@ mod tests {
         in_msg.put(command_complete("2")); // C
         in_msg.put(ready_for_query(false)); // Z
         let out_msg = set_messages_right_place(in_msg.to_vec()).expect("parse");
-        println!("112tC2tCZ");
         assert_eq!(show_headers(out_msg), "12tC12tCZ".to_string());
     }
 
