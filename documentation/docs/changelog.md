@@ -4,6 +4,10 @@ title: Changelog
 
 # Changelog
 
+### 2.0.0 <small>July 22, 2025</small> { id="1.9.0" }
+
+- Added `tls_mode` configuration option to enhance security with flexible TLS connection management and client certificate validation capabilities.
+
 ### 1.9.0 <small>July 20, 2025</small> { id="1.9.0" }
 
 - Added pam auth support.
