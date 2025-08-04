@@ -139,17 +139,15 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.TOKEN }}
 
-  build:
+  docker-image:
+    name: Build docker image and push to registry
     runs-on: ubuntu-latest
     permissions:
       packages: write
       contents: read
     strategy:
       fail-fast: false
-      matrix:
-        image:
-          - name: 'ubuntu:latest'
-            suffix: ''
+
     steps:
       - uses: actions/checkout@v4
 
@@ -161,7 +159,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ github.TOKEN }}
 
       - name: Build and push
         id: docker-build
@@ -170,7 +168,4 @@ jobs:
           push: true
           file: ./Dockerfile
           platforms: linux/amd64,linux/arm64
-          build-args: |
-            VERSION=${{ github.ref_name }}
-            APP_IMAGE=${{ matrix.image.name }}
-          tags: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:${{ github.ref_name }}${{ matrix.image.suffix }}
+          tags: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:${{ github.ref_name }}
