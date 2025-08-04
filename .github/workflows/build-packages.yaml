@@ -168,7 +168,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           push: true
-          file: ./build/package/Dockerfile
+          file: ./Dockerfile
           platforms: linux/amd64,linux/arm64
           build-args: |
             VERSION=${{ github.ref_name }}
